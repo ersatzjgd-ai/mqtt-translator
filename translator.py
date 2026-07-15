@@ -1,39 +1,51 @@
 import paho.mqtt.client as mqtt
 import requests
-import json
+import time
 
-# 1. Listen to your external Mosquitto Broker
-MQTT_BROKER = "tokaido.proxy.rlwy.net" 
-MQTT_PORT = 45223
+# Use Railway's internal network names!
+# Replace 'find3-mqtt-broker' with the exact name of your Mosquitto service on Railway
+MQTT_BROKER = "find3-mqtt-broker" 
+MQTT_PORT = 1883 # Internal port, no proxy needed!
 MQTT_TOPIC = "kaverigm/passive"
 
-# 2. Point to FIND3's INTERNAL HTTP API (Localhost/Docker network)
-FIND3_HTTP_URL = "http://localhost:8003/passive" 
+# Replace 'find3' with the exact name of your FIND3 service on Railway
+FIND3_HTTP_URL = "http://find3-production:8003/passive"
 
 def on_connect(client, userdata, flags, rc):
-    print(f"Connected to MQTT Broker with result code {rc}")
-    client.subscribe(MQTT_TOPIC)
-    print(f"Listening for JSON on {MQTT_TOPIC}...")
+    if rc == 0:
+        print("SUCCESS: Connected to internal Mosquitto Broker!")
+        client.subscribe(MQTT_TOPIC)
+        print(f"Listening for JSON on {MQTT_TOPIC}...")
+    else:
+        print(f"Failed to connect, return code {rc}")
 
 def on_message(client, userdata, msg):
     try:
-        # Catch the perfect JSON from the ESP32
         payload = msg.payload.decode('utf-8')
-        print(f"Caught payload: {payload}")
+        print(f"Caught ESP32 payload: {payload}")
         
-        # Fire it instantly into FIND3 via internal HTTP
         headers = {'Content-Type': 'application/json'}
         response = requests.post(FIND3_HTTP_URL, data=payload, headers=headers)
         
         print(f"FIND3 Response: {response.status_code} - {response.text}")
-        
     except Exception as e:
         print(f"Translation Error: {e}")
 
 client = mqtt.Client()
-# client.username_pw_set("kaveri_edge", "SecureLounge2026!") # Add if using auth
+
+# IF you set a username/password on your Mosquitto broker, uncomment and fill in this line:
+# client.username_pw_set("kaverigm", "70eix") 
+
 client.on_connect = on_connect
 client.on_message = on_message
 
-client.connect(MQTT_BROKER, MQTT_PORT, 60)
+# Keep trying to connect if Mosquitto is still booting up
+while True:
+    try:
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        break
+    except Exception as e:
+        print(f"Waiting for Mosquitto to come online... ({e})")
+        time.sleep(5)
+
 client.loop_forever()
