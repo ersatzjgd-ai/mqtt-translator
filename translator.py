@@ -34,7 +34,7 @@ def on_message(client, userdata, msg):
 client = mqtt.Client()
 
 # IF you set a username/password on your Mosquitto broker, uncomment and fill in this line:
-# client.username_pw_set("kaverigm", "70eix") 
+client.username_pw_set("kaverigm", "70eix") 
 
 client.on_connect = on_connect
 client.on_message = on_message
